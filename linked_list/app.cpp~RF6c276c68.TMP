@@ -1,0 +1,97 @@
+#include <iostream>
+#include "LIB_LinkedList.h"
+
+// Custom struct to store actual data
+typedef struct myNode {
+    Node node;
+    int data;
+} MyNode;
+
+// Print the list (head to tail)
+void printList(LinkedList* list) {
+    Node* current = list->head;
+    std::cout << "List: ";
+    while (current != nullptr) {
+        MyNode* my = (MyNode*)current;
+        std::cout << my->data << " ";
+        current = current->next;
+    }
+    std::cout << std::endl;
+}
+
+// Print the list in reverse (tail to head)
+void printListReverse(LinkedList* list) {
+    if (list->head == nullptr) {
+        std::cout << "List is empty." << std::endl;
+        return;
+    }
+
+    Node* current = list->head;
+    while (current->next != nullptr)
+        current = current->next;
+
+    std::cout << "List (reverse): ";
+    while (current != nullptr) {
+        MyNode* my = (MyNode*)current;
+        std::cout << my->data << " ";
+        current = current->prev;
+    }
+    std::cout << std::endl;
+}
+
+int main() {
+    LinkedList list;
+    linkedListInit(&list);
+
+    MyNode n1 = { {nullptr, nullptr}, 10 };
+    MyNode n2 = { {nullptr, nullptr}, 20 };
+    MyNode n3 = { {nullptr, nullptr}, 30 };
+    MyNode n4 = { {nullptr, nullptr}, 40 };
+    MyNode n5 = { {nullptr, nullptr}, 50 };
+
+    std::cout << "=== Doubly Linked List Demo ===" << std::endl << std::endl;
+
+    std::cout << "InsertFirst(10):" << std::endl;
+    insertFirst(&list, (Node*)&n1);
+    printList(&list);
+    printListReverse(&list);
+
+    std::cout << std::endl << "InsertLast(20):" << std::endl;
+    insertLast(&list, (Node*)&n2);
+    printList(&list);
+    printListReverse(&list);
+
+    std::cout << std::endl << "InsertLast(30):" << std::endl;
+    insertLast(&list, (Node*)&n3);
+    printList(&list);
+    printListReverse(&list);
+
+    std::cout << std::endl << "InsertAfter(40 after 20):" << std::endl;
+    insertAfter(&list, (Node*)&n4, (Node*)&n2);
+    printList(&list);
+    printListReverse(&list);
+
+    std::cout << std::endl << "InsertBefore(50 before 10):" << std::endl;
+    insertBefore(&list, (Node*)&n5, (Node*)&n1);
+    printList(&list);
+    printListReverse(&list);
+
+    std::cout << std::endl << "RemoveNode(20):" << std::endl;
+    removeNode(&list, (Node*)&n2);
+    printList(&list);
+    printListReverse(&list);
+
+    std::cout << std::endl << "RemoveNode(50):" << std::endl;
+    removeNode(&list, (Node*)&n5);
+    printList(&list);
+    printListReverse(&list);
+
+    std::cout << std::endl << "RemoveNode(30):" << std::endl;
+    removeNode(&list, (Node*)&n3);
+    printList(&list);
+    printListReverse(&list);
+
+    std::cout << std::endl << "All operations done." << std::endl;
+
+    return 0;
+}
