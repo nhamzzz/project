@@ -1,16 +1,18 @@
-﻿#include <stdio.h>
-#include <iostream>
+﻿#include <iostream>
 #include "LIB_LinkedList.h"
-
-// Custom struct to store actual data
-typedef struct myNode {
-    Node node;
-    int data;
-} MyNode;
 
 // Initialize the list
 void linkedListInit(LinkedList* list) {
     list->head = nullptr;
+}
+
+// Create node
+Data* createNode(int value) {
+    Data* newNode = new Data;
+    newNode->data = value;
+    newNode->node.next = nullptr;
+    newNode->node.prev = nullptr;
+    return newNode;
 }
 
 // Insert at the beginning
@@ -19,7 +21,6 @@ void insertFirst(LinkedList* list, Node* node_to_insert) {
         return;
 
     if (list->head == nullptr) {
-        // First node in the list
         list->head = node_to_insert;
         node_to_insert->next = node_to_insert;
         node_to_insert->prev = node_to_insert;
@@ -56,7 +57,6 @@ void insertLast(LinkedList* list, Node* node_to_insert) {
     list->head->prev = node_to_insert;
 }
 
-
 // Insert after a specific node
 void insertAfter(LinkedList* list, Node* node_to_insert, Node* node_ref) {
     if (list == nullptr || node_to_insert == nullptr || node_ref == nullptr)
@@ -65,10 +65,12 @@ void insertAfter(LinkedList* list, Node* node_to_insert, Node* node_ref) {
     node_to_insert->next = node_ref->next;
     node_to_insert->prev = node_ref;
 
-    if (node_ref->next != nullptr)
-        node_ref->next->prev = node_to_insert;
-
+    node_ref->next->prev = node_to_insert;
     node_ref->next = node_to_insert;
+
+    // // if we inserted after the tail (head->prev), update tail's next
+    // if (node_ref == list->head->prev)
+    //     list->head->prev = node_to_insert;
 }
 
 // Insert before a specific node
@@ -79,12 +81,12 @@ void insertBefore(LinkedList* list, Node* node_to_insert, Node* node_ref) {
     node_to_insert->next = node_ref;
     node_to_insert->prev = node_ref->prev;
 
-    if (node_ref->prev != nullptr)
-        node_ref->prev->next = node_to_insert;
-    else
-        list->head = node_to_insert; // Inserting before the first node
-
+    node_ref->prev->next = node_to_insert;
     node_ref->prev = node_to_insert;
+
+    // If we inserted before the head, update head pointer
+    if (node_ref == list->head)
+        list->head = node_to_insert;
 }
 
 // Remove a node from the list
@@ -99,15 +101,25 @@ void removeNode(LinkedList* list, Node* node_to_remove) {
         return;
     }
 
-    // Fix links
     node_to_remove->prev->next = node_to_remove->next;
     node_to_remove->next->prev = node_to_remove->prev;
 
-    // Update head if needed
     if (list->head == node_to_remove)
         list->head = node_to_remove->next;
 
     node_to_remove->next = node_to_remove->prev = nullptr;
+}
+
+// Detaches and deallocates (frees) memory
+void deleteNode(LinkedList* list, Node* node_to_delete) {
+    if (list == nullptr || node_to_delete == nullptr)
+        return;
+
+    removeNode(list, node_to_delete); // unlink from the list
+
+    // Now safely delete the node memory
+    Data* dataNode = (Data*)node_to_delete;
+    delete dataNode;
 }
 
 
@@ -121,11 +133,15 @@ void printList(LinkedList* list) {
     Node* current = list->head;
     std::cout << "List: ";
     do {
-        MyNode* my = (MyNode*)current;
-        std::cout << my->data << " -> ";
+        Data* dataNode = (Data*)current;
+        std::cout << dataNode->data;
+        if (current->next != list->head)
+            std::cout << " -> ";
+        else
+            std::cout << " -> (back to head)";
         current = current->next;
     } while (current != list->head);
-    std::cout << "(back to head)" << std::endl;
+    std::cout << std::endl;
 }
 
 // Print the list in reverse (tail to head)
@@ -139,64 +155,13 @@ void printListReverse(LinkedList* list) {
     Node* current = tail;
     std::cout << "List (reverse): ";
     do {
-        MyNode* my = (MyNode*)current;
-        std::cout << my->data << " -> ";
+        Data* dataNode = (Data*)current;
+        std::cout << dataNode->data;
+        if (current->prev != tail)
+            std::cout << " <- ";
+        else
+            std::cout << " <- (back to tail)";
         current = current->prev;
     } while (current != tail);
-    std::cout << "(back to tail)" << std::endl;
-}
-
-int main(void) {
-    LinkedList list;
-    linkedListInit(&list);
-
-    MyNode n1 = { {nullptr, nullptr}, 10 };
-    MyNode n2 = { {nullptr, nullptr}, 20 };
-    MyNode n3 = { {nullptr, nullptr}, 30 };
-    MyNode n4 = { {nullptr, nullptr}, 40 };
-    MyNode n5 = { {nullptr, nullptr}, 50 };
-
-    std::cout << "=== Doubly Linked List Demo ===" << std::endl << std::endl;
-
-    std::cout << "InsertFirst(10):" << std::endl;
-    insertFirst(&list, (Node*)&n1);
-    printList(&list);
-    printListReverse(&list);
-
-    std::cout << std::endl << "InsertLast(20):" << std::endl;
-    insertLast(&list, (Node*)&n2);
-    printList(&list);
-    printListReverse(&list);
-
-    std::cout << std::endl << "InsertLast(30):" << std::endl;
-    insertLast(&list, (Node*)&n3);
-    printList(&list);
-    printListReverse(&list);
-
-    std::cout << std::endl << "InsertAfter(40 after 20):" << std::endl;
-    insertAfter(&list, (Node*)&n4, (Node*)&n2);
-    printList(&list);
-    printListReverse(&list);
-
-    std::cout << std::endl << "InsertBefore(50 before 10):" << std::endl;
-    insertBefore(&list, (Node*)&n5, (Node*)&n1);
-    printList(&list);
-    printListReverse(&list);
-
-    std::cout << std::endl << "RemoveNode(20):" << std::endl;
-    removeNode(&list, (Node*)&n2);
-    printList(&list);
-    printListReverse(&list);
-
-    std::cout << std::endl << "RemoveNode(50):" << std::endl;
-    removeNode(&list, (Node*)&n5);
-    printList(&list);
-    printListReverse(&list);
-
-    std::cout << std::endl << "RemoveNode(30):" << std::endl;
-    removeNode(&list, (Node*)&n3);
-    printList(&list);
-    printListReverse(&list);
-
-    return 0;
+    std::cout << std::endl;
 }
