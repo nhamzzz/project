@@ -44,14 +44,17 @@ bool recv_cmd(int s, cmd& c) {
 }
 
 /* =======================
-   Logout notification
+   Notify listener on logout
    ======================= */
 
 void notify_listener_logout(const std::string& user) {
-    if (!clients.count(user))
-        return;
+    int listener = -1;
 
-    int listener = clients[user].listener;
+    pthread_mutex_lock(&clients_mutex);
+    if (clients.count(user))
+        listener = clients[user].listener;
+    pthread_mutex_unlock(&clients_mutex);
+
     if (listener == -1)
         return;
 
@@ -61,35 +64,39 @@ void notify_listener_logout(const std::string& user) {
     c.time = time(nullptr);
 
     strcpy(c.data.msg.username, "SERVER");
-    snprintf(c.data.msg.msg,
-             sizeof(c.data.msg.msg),
-             "You have been logged out.");
+    strcpy(c.data.msg.msg, "You have been logged out.");
 
     send_cmd(listener, c);
 }
 
 /* =======================
-   Broadcast
+   Broadcast messages
    ======================= */
 
 void broadcast(const cmd& message) {
-    std::vector<std::string> delivered;
+    std::vector<int> listeners;
+    std::vector<std::string> names;
 
+    pthread_mutex_lock(&clients_mutex);
     for (auto& [user, client] : clients) {
         if (client.listener != -1) {
-            send_cmd(client.listener, message);
-            delivered.push_back(user);
+            listeners.push_back(client.listener);
+            names.push_back(user);
         }
     }
+    pthread_mutex_unlock(&clients_mutex);
+
+    for (int s : listeners)
+        send_cmd(s, message);
 
     std::cout << "[" << now() << "] Broadcast from "
               << message.data.msg.username;
 
-    if (!delivered.empty()) {
+    if (!names.empty()) {
         std::cout << " → delivered to: ";
-        for (size_t i = 0; i < delivered.size(); ++i) {
+        for (size_t i = 0; i < names.size(); ++i) {
             if (i) std::cout << ", ";
-            std::cout << delivered[i];
+            std::cout << names[i];
         }
     } else {
         std::cout << " → no listeners";
@@ -99,7 +106,7 @@ void broadcast(const cmd& message) {
 }
 
 /* =======================
-   Client worker
+   Client worker thread
    ======================= */
 
 void* client_worker(void* arg) {
@@ -127,20 +134,13 @@ void* client_worker(void* arg) {
             std::cout << "[" << now() << "] "
                       << user << ": "
                       << c.data.msg.msg << "\n";
-
-            pthread_mutex_lock(&clients_mutex);
             broadcast(c);
-            pthread_mutex_unlock(&clients_mutex);
             break;
 
         case cmd_logout:
             std::cout << "[" << now() << "] "
                       << user << " requested logout\n";
-
-            pthread_mutex_lock(&clients_mutex);
             notify_listener_logout(user);
-            pthread_mutex_unlock(&clients_mutex);
-
             goto cleanup;
 
         default:
@@ -154,10 +154,8 @@ cleanup:
     if (clients.count(user)) {
         if (clients[user].sender != -1)
             close(clients[user].sender);
-
         if (clients[user].listener != -1)
             close(clients[user].listener);
-
         clients.erase(user);
     }
 
