@@ -5,16 +5,20 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <pthread.h>
-#include <ctime>
+#include <time.h>
 
 #include "cmd.h"
 
 /* =======================
-   Global socket list
-   (NO mutex – unsafe by design)
+   Listener registry
    ======================= */
 
-std::vector<int> listeners;
+struct Listener {
+    int sock;
+    std::string username;
+};
+
+std::vector<Listener> listeners;
 
 /* =======================
    Utilities
@@ -36,18 +40,47 @@ bool recv_cmd(int s, cmd& c) {
 }
 
 /* =======================
-   Broadcast (NO mutex)
+   Broadcast
    ======================= */
 
-void broadcast(const cmd& c, int sender) {
-    for (int s : listeners) {
-        if (s != sender) {
-            send_cmd(s, c);
+void broadcast(const cmd& c, int exclude = -1) {
+    std::vector<std::string> delivered;
+
+    for (auto& l : listeners) {
+        if (l.sock != exclude) {
+            send_cmd(l.sock, c);
+            delivered.push_back(l.username);
         }
     }
 
     std::cout << "[" << now() << "] Broadcast from "
-              << c.data.msg.username << "\n";
+              << c.data.msg.username;
+
+    if (!delivered.empty()) {
+        std::cout << " → delivered to: ";
+        for (size_t i = 0; i < delivered.size(); ++i) {
+            if (i) std::cout << ", ";
+            std::cout << delivered[i];
+        }
+    } else {
+        std::cout << " → no listeners";
+    }
+
+    std::cout << "\n";
+}
+
+/* =======================
+   Remove listener
+   ======================= */
+
+void remove_listener(const std::string& user) {
+    for (auto it = listeners.begin(); it != listeners.end(); ++it) {
+        if (it->username == user) {
+            close(it->sock);
+            listeners.erase(it);
+            break;
+        }
+    }
 }
 
 /* =======================
@@ -68,7 +101,7 @@ void* client_thread(void* arg) {
     bool is_listener = login.data.login.listener;
 
     if (is_listener) {
-        listeners.push_back(sock);
+        listeners.push_back({sock, user});
         std::cout << "[" << now() << "] "
                   << user << " listener connected\n";
     } else {
@@ -88,11 +121,23 @@ void* client_thread(void* arg) {
             broadcast(c, sock);
             break;
 
-        case cmd_logout:
+        case cmd_logout: {
             std::cout << "[" << now() << "] "
                       << user << " logged out\n";
+
+            /* create logout broadcast */
+            cmd out{};
+            out.type = cmd_response;
+            out.id   = cmd_logout;
+            out.time = time(nullptr);
+            strcpy(out.data.logout.username, user.c_str());
+
+            broadcast(out);
+            remove_listener(user);
+
             close(sock);
             return nullptr;
+        }
 
         default:
             break;
